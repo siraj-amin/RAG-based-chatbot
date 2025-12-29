@@ -7,10 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/1SiLZaflpm5ZKQEmb4vCuyAKcRHpfJKEk
 """
 
-pip install langchain_community langchainhub chromadb langchain langchain_openai pypdf
 
-pip install -U langchain-text-splitters
-pip install -qU langchain-openai
 
 from langchain_community.document_loaders import PyPDFLoader
 
@@ -30,11 +27,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100)
 texts = text_splitter.split_text("docs")
 
-pip install sentence-transformers
-
-pip install langchain-chroma chromadb
-pip install langchain chromadb
-
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
@@ -50,10 +42,6 @@ vectorstore = Chroma.from_documents(
 
 retriever = vectorstore.as_retriever()
 
-pip install langchain-classic
-
-pip install streamlit
-
 from langchain_core.prompts import ChatPromptTemplate
 
 prompt = ChatPromptTemplate.from_template("""
@@ -62,8 +50,6 @@ Question: {question}
 Context: {context}
 Answer:
 """)
-
-pip install langchain-huggingface huggingface-hub
 
 import os
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
