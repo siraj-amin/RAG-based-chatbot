@@ -1,10 +1,10 @@
 streamlit
 langchain
-langchain-core
-langchain-huggingface
-langchain-chroma
-langchain-community
-sentence-transformers
+langchain_community
+langchainhub
 chromadb
-huggingface_hub
+langchain_openai
+langchain_chroma
 pypdf
+langchain-huggingface
+sentence-transformers
