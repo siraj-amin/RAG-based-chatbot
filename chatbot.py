@@ -1,4 +1,4 @@
-# chatbot_ui.py - Streamlit RAG chatbot with enhanced UI/UX
+# chatbot.py - Streamlit-ready RAG chatbot with enhanced UI/UX
 
 import os
 import streamlit as st
@@ -23,7 +23,6 @@ os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 # -----------------------------
 st.set_page_config(page_title="RAG Chatbot 🤖", layout="wide", page_icon="🤖")
 
-# Custom header with animation (using markdown + emoji)
 st.markdown("""
 <div style="text-align: center;">
     <h1 style="color:#4B9CD3;">🤖 My RAG Chatbot</h1>
@@ -31,7 +30,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Chat container
 chat_container = st.container()
 
 if "messages" not in st.session_state:
@@ -90,7 +88,7 @@ endpoint = HuggingFaceEndpoint(
 llm = ChatHuggingFace(llm=endpoint)
 
 # -----------------------------
-# HANDLE USER INPUT
+# FUNCTION TO GET ANSWER
 # -----------------------------
 def get_answer(question):
     """Retrieve context and get answer from LLM."""
@@ -106,18 +104,21 @@ def get_answer(question):
         answer = f"Error retrieving answer: {e}"
     return answer
 
-# Chat input
-with st.chat_input("Type your question here...") as user_input:
-    if user_input:
-        # Display user message
-        st.session_state.messages.append({"role": "user", "content": user_input})
+# -----------------------------
+# CHAT INPUT
+# -----------------------------
+user_input = st.chat_input("Type your question here...")
 
-        # Show spinner while LLM processes
-        with st.spinner("Generating answer... 🤖"):
-            answer = get_answer(user_input)
+if user_input:
+    # Display user message
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
-        # Display assistant message
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+    # Show spinner while LLM processes
+    with st.spinner("Generating answer... 🤖"):
+        answer = get_answer(user_input)
+
+    # Display assistant message
+    st.session_state.messages.append({"role": "assistant", "content": answer})
 
 # -----------------------------
 # DISPLAY CHAT HISTORY WITH AVATARS
