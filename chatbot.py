@@ -1,6 +1,5 @@
-# chatbot.py - Streamlit-ready RAG chatbot with enhanced UI/UX
-
 import os
+import time
 import streamlit as st
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -15,64 +14,45 @@ from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 PDF_FILE = "sdg.pdf"
 VECTORSTORE_DIR = "./chroma_db"
 
-# HuggingFace API token
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 
 # -----------------------------
-# STREAMLIT UI SETUP
+# STREAMLIT SETUP
 # -----------------------------
-st.set_page_config(page_title="RAG Chatbot 🤖", layout="wide", page_icon="🤖")
-
-st.markdown("""
-<div style="text-align: center;">
-    <h1 style="color:#4B9CD3;">🤖 My RAG Chatbot</h1>
-    <p style="color:#6C757D; font-size:16px;">Ask any question about your documents and get concise answers instantly!</p>
-</div>
-""", unsafe_allow_html=True)
-
-chat_container = st.container()
+st.set_page_config(page_title="RAG Chatbot", page_icon="🤖")
+st.title("🤖 My RAG Chatbot")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # -----------------------------
-# LOAD OR BUILD VECTORSTORE
+# LOAD VECTORSTORE
 # -----------------------------
-try:
-    if os.path.exists(VECTORSTORE_DIR) and os.listdir(VECTORSTORE_DIR):
-        vectorstore = Chroma(
-            persist_directory=VECTORSTORE_DIR,
-            embedding_function=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        )
-    else:
-        loader = PyPDFLoader(PDF_FILE)
-        docs = loader.load()
-
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100)
-        split_docs = []
-        for doc in docs:
-            split_docs.extend(text_splitter.split_text(doc.page_content))
-
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        vectorstore = Chroma.from_documents(
-            documents=docs,
-            embedding=embeddings,
-            persist_directory=VECTORSTORE_DIR
-        )
-except Exception as e:
-    st.error(f"Error loading PDF or vectorstore: {e}")
-    st.stop()
-
-retriever = vectorstore.as_retriever()
+if os.path.exists(VECTORSTORE_DIR) and os.listdir(VECTORSTORE_DIR):
+    vectorstore = Chroma(
+        persist_directory=VECTORSTORE_DIR,
+        embedding_function=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    )
+else:
+    loader = PyPDFLoader(PDF_FILE)
+    docs = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100)
+    split_docs = []
+    for doc in docs:
+        split_docs.extend(text_splitter.split_text(doc.page_content))
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    vectorstore = Chroma.from_documents(
+        documents=docs,
+        embedding=embeddings,
+        persist_directory=VECTORSTORE_DIR
+    )
 
 # -----------------------------
-# PROMPT AND LLM SETUP
+# PROMPT & LLM SETUP
 # -----------------------------
 prompt = ChatPromptTemplate.from_template("""
-You are an assistant for question-answering tasks. 
-Use the following pieces of retrieved context to answer the question. 
-If you don't know the answer, just say that you don't know. 
-Use three sentences maximum and keep the answer concise.
+You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. 
+If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.
 
 Question: {question}
 Context: {context}
@@ -88,44 +68,11 @@ endpoint = HuggingFaceEndpoint(
 llm = ChatHuggingFace(llm=endpoint)
 
 # -----------------------------
-# FUNCTION TO GET ANSWER
+# DISPLAY CHAT HISTORY WITH BUBBLES
 # -----------------------------
-def get_answer(question):
-    """Retrieve context and get answer from LLM."""
-    try:
-        if hasattr(retriever, "get_relevant_documents"):
-            docs = retriever.get_relevant_documents(question)
-        else:
-            docs = retriever.retrieve(question)
-
-        context = "\n\n".join([d.page_content for d in docs])
-        answer = llm.invoke(prompt.format({"context": context, "question": question}))
-    except Exception as e:
-        answer = f"Error retrieving answer: {e}"
-    return answer
-
-# -----------------------------
-# CHAT INPUT
-# -----------------------------
-user_input = st.chat_input("Type your question here...")
-
-if user_input:
-    # Display user message
-    st.session_state.messages.append({"role": "user", "content": user_input})
-
-    # Show spinner while LLM processes
-    with st.spinner("Generating answer... 🤖"):
-        answer = get_answer(user_input)
-
-    # Display assistant message
-    st.session_state.messages.append({"role": "assistant", "content": answer})
-
-# -----------------------------
-# DISPLAY CHAT HISTORY WITH AVATARS
-# -----------------------------
-for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        with chat_container:
+def display_messages():
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
             st.markdown(f"""
             <div style="display:flex; align-items:center; margin:10px 0;">
                 <div style="background-color:#D1E7DD; padding:10px 15px; border-radius:15px; max-width:70%;">
@@ -134,8 +81,7 @@ for msg in st.session_state.messages:
                 <div style="margin-left:10px;">👤</div>
             </div>
             """, unsafe_allow_html=True)
-    else:
-        with chat_container:
+        else:
             st.markdown(f"""
             <div style="display:flex; align-items:center; margin:10px 0; justify-content:flex-end;">
                 <div style="margin-right:10px;">🤖</div>
@@ -144,3 +90,43 @@ for msg in st.session_state.messages:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+display_messages()
+
+# -----------------------------
+# GET BOT ANSWER WITH TYPING ANIMATION
+# -----------------------------
+question = st.chat_input("Ask your question")
+
+if question:
+    st.session_state.messages.append({"role": "user", "content": question})
+    display_messages()  # show updated chat
+
+    bot_placeholder = st.empty()  # placeholder for typing animation
+
+    with st.spinner("Bot is typing... 🤖"):
+        # Retrieve relevant docs using similarity_search
+        docs = vectorstore.similarity_search(question, k=5)
+        context = "\n\n".join([d.page_content for d in docs])
+
+        # Call your existing RAG chain
+        chain = prompt | llm
+        answer = chain.invoke({"context": context, "question": question})
+
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+
+    # Typing animation: display one character at a time
+    typed_answer = ""
+    for char in answer:
+        typed_answer += char
+        bot_placeholder.markdown(f"""
+        <div style="display:flex; align-items:center; margin:10px 0; justify-content:flex-end;">
+            <div style="margin-right:10px;">🤖</div>
+            <div style="background-color:#E2E3E5; padding:10px 15px; border-radius:15px; max-width:70%;">
+                <strong>Bot:</strong> {typed_answer}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        time.sleep(0.02)  # adjust typing speed
+
+    display_messages()  # ensure full answer is displayed at the end
