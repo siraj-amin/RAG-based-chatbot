@@ -1,4 +1,4 @@
-# chatbot.py - Streamlit-ready RAG chatbot with persistent vectorstore
+# chatbot_ui.py - Streamlit RAG chatbot with enhanced UI/UX
 
 import os
 import streamlit as st
@@ -10,53 +10,61 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 
 # -----------------------------
-# HUGGINGFACE API TOKEN
+# CONFIG
 # -----------------------------
+PDF_FILE = "sdg.pdf"
+VECTORSTORE_DIR = "./chroma_db"
+
+# HuggingFace API token
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 
 # -----------------------------
 # STREAMLIT UI SETUP
 # -----------------------------
-st.set_page_config(page_title="RAG Chatbot")
-st.title("🤖 My RAG Chatbot")
+st.set_page_config(page_title="RAG Chatbot 🤖", layout="wide", page_icon="🤖")
+
+# Custom header with animation (using markdown + emoji)
+st.markdown("""
+<div style="text-align: center;">
+    <h1 style="color:#4B9CD3;">🤖 My RAG Chatbot</h1>
+    <p style="color:#6C757D; font-size:16px;">Ask any question about your documents and get concise answers instantly!</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Chat container
+chat_container = st.container()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display chat history
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
 # -----------------------------
-# LOAD PDF AND VECTORSTORE
+# LOAD OR BUILD VECTORSTORE
 # -----------------------------
-PDF_FILE = "sdg.pdf"
-VECTORSTORE_DIR = "./chroma_db"
+try:
+    if os.path.exists(VECTORSTORE_DIR) and os.listdir(VECTORSTORE_DIR):
+        vectorstore = Chroma(
+            persist_directory=VECTORSTORE_DIR,
+            embedding_function=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        )
+    else:
+        loader = PyPDFLoader(PDF_FILE)
+        docs = loader.load()
 
-# Only create embeddings if vectorstore does not exist
-if os.path.exists(VECTORSTORE_DIR) and os.listdir(VECTORSTORE_DIR):
-    vectorstore = Chroma(persist_directory=VECTORSTORE_DIR, embedding_function=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"))
-else:
-    # Load PDF
-    loader = PyPDFLoader(PDF_FILE)
-    docs = loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100)
+        split_docs = []
+        for doc in docs:
+            split_docs.extend(text_splitter.split_text(doc.page_content))
 
-    # Split text into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100)
-    split_docs = []
-    for doc in docs:
-        split_docs.extend(text_splitter.split_text(doc.page_content))
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        vectorstore = Chroma.from_documents(
+            documents=docs,
+            embedding=embeddings,
+            persist_directory=VECTORSTORE_DIR
+        )
+except Exception as e:
+    st.error(f"Error loading PDF or vectorstore: {e}")
+    st.stop()
 
-    # Create embeddings
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    vectorstore = Chroma.from_documents(
-        documents=docs,
-        embedding=embeddings,
-        persist_directory=VECTORSTORE_DIR
-    )
-
-# Retriever
 retriever = vectorstore.as_retriever()
 
 # -----------------------------
@@ -84,17 +92,54 @@ llm = ChatHuggingFace(llm=endpoint)
 # -----------------------------
 # HANDLE USER INPUT
 # -----------------------------
-if question := st.chat_input("Ask your question"):
-    st.session_state.messages.append({"role": "user", "content": question})
+def get_answer(question):
+    """Retrieve context and get answer from LLM."""
+    try:
+        if hasattr(retriever, "get_relevant_documents"):
+            docs = retriever.get_relevant_documents(question)
+        else:
+            docs = retriever.retrieve(question)
 
-    # Retrieve relevant documents
-    docs = retriever.get_relevant_documents(question)
-    context = "\n\n".join([d.page_content for d in docs])
+        context = "\n\n".join([d.page_content for d in docs])
+        answer = llm.invoke(prompt.format({"context": context, "question": question}))
+    except Exception as e:
+        answer = f"Error retrieving answer: {e}"
+    return answer
 
-    # Create prompt + call LLM
-    answer = llm.invoke(prompt.format({"context": context, "question": question}))
+# Chat input
+with st.chat_input("Type your question here...") as user_input:
+    if user_input:
+        # Display user message
+        st.session_state.messages.append({"role": "user", "content": user_input})
 
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+        # Show spinner while LLM processes
+        with st.spinner("Generating answer... 🤖"):
+            answer = get_answer(user_input)
 
-    with st.chat_message("assistant"):
-        st.markdown(answer)
+        # Display assistant message
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+
+# -----------------------------
+# DISPLAY CHAT HISTORY WITH AVATARS
+# -----------------------------
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        with chat_container:
+            st.markdown(f"""
+            <div style="display:flex; align-items:center; margin:10px 0;">
+                <div style="background-color:#D1E7DD; padding:10px 15px; border-radius:15px; max-width:70%;">
+                    <strong>You:</strong> {msg["content"]}
+                </div>
+                <div style="margin-left:10px;">👤</div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        with chat_container:
+            st.markdown(f"""
+            <div style="display:flex; align-items:center; margin:10px 0; justify-content:flex-end;">
+                <div style="margin-right:10px;">🤖</div>
+                <div style="background-color:#E2E3E5; padding:10px 15px; border-radius:15px; max-width:70%;">
+                    <strong>Bot:</strong> {msg["content"]}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
