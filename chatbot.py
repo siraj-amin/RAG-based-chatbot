@@ -77,10 +77,6 @@ rag_chain = ({"context" : retriever | format_docs, "question" : RunnablePassthro
              | StrOutputParser()
              )
 
-rag_chain.invoke("What are the factors influencing the implementation of crop diversification ?")
-
-rag_chain.invoke("What is the summary ?")
-
 from langchain_core.runnables import RunnableLambda
 
 def print_prompt(prompt_text):
@@ -93,10 +89,6 @@ rag_chain_with_print = ({"context" : retriever | format_docs, "question" : Runna
              | llm
              | StrOutputParser()
              )
-
-rag_chain_with_print.invoke("What contributions can i make ? ")
-
-rag_chain.invoke("What is the conclusion ?")
 
 import streamlit as st
 import os
